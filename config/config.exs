@@ -22,7 +22,7 @@ use Mix.Config
 #
 
 config :nxredirect,
-  primary: {'localhost', 53},
+  primary: {'10.1.1.1', 53},
   fallback: {'8.8.8.8', 53},
   port: 5354
 

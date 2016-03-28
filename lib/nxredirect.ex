@@ -1,10 +1,18 @@
 defmodule NXRedirect do
   use Application
+  require Record
   require Logger
+
+  Record.defrecord :hostent,
+    Record.extract(:hostent, from_lib: "kernel/include/inet.hrl")
 
   @doc false
   def start(_type, _args) do
     import Supervisor.Spec
+    Logger.info "Waiting startup…"
+    wait_dns
+    Logger.info "Start application!"
+
     children = [
       supervisor(Task.Supervisor, [[name: NXRedirect.TaskSupervisor]]),
       worker(Task, [NXRedirect, :accept, [port(), primary(), fallback()]])
@@ -22,22 +30,49 @@ defmodule NXRedirect do
       port,
       [:binary, active: true, reuseaddr: true]
     )
-    recv_main(primary, %{}, %{})
+    Logger.info "Test in"
+    recv_main(primary, fallback, %{}, %{})
+    #test_recv(socket, 0)
+  end
+
+  defp test_recv(socket, i) do
+    receive do
+      {:udp, ^socket, addr, port, packet} ->
+        Logger.info "Main #{inspect packet}"
+        :gen_udp.send(socket, addr, port, "#{i}\n")
+    end
+    test_recv(socket, i+1)
+  end
+
+  defp wait_dns() do
+    case :inet_res.gethostbyname('localhost') do
+      {:ok, _} -> nil
+      {:error, _} ->
+        :timer.sleep(500)
+        wait_dns
+    end
   end
 
   defp primary() do
-    Application.get_env(:nxredirect, :primary)
+    parse_host(Application.get_env(:nxredirect, :primary))
   end
 
   defp fallback() do
-    Application.get_env(:nxredirect, :fallback)
+    parse_host(Application.get_env(:nxredirect, :fallback))
+  end
+
+  defp parse_host(host_port) do
+    {:ok, addr} = :inet.parse_address(elem(host_port, 0))
+    #{:ok, host} = :inet_res.gethostbyname(elem(host_port, 0))
+    #[addr | _] = hostent(host, :h_addr_list)
+    {addr, elem(host_port, 1)}
   end
 
   defp port() do
     Application.get_env(:nxredirect, :port)
   end
 
-  defp recv_main(primary, clients, refs) do
+  defp recv_main(primary, fallback, clients, refs) do
     {clients, refs} = receive do
       {:udp, socket, addr, port, packet} ->
         client = {socket, addr, port}
@@ -45,7 +80,7 @@ defmodule NXRedirect do
         {pid, clients, refs} = case Map.fetch(clients, client) do
           {:ok, pid} -> {pid, clients, refs}
           :error ->
-            pid = start_child(client, primary)
+            pid = start_child(client, primary, fallback)
             clients = Map.put(clients, client, pid)
             refs = Map.put(refs, Process.monitor(pid), client)
             {pid, clients, refs}
@@ -61,42 +96,122 @@ defmodule NXRedirect do
         Logger.info "MAIN: Ignoring #{inspect msg}"
         {clients, refs}
     end
-    recv_main primary, clients, refs
+    recv_main(primary, fallback, clients, refs)
   end
 
-  defp start_child(client, primary) do
+  defp start_child(client, primary, fallback) do
     {:ok, pid} = Task.Supervisor.start_child(
       NXRedirect.TaskSupervisor,
-      fn -> begin(client, primary) end
+      fn -> begin(client, primary, fallback) end
     )
     Logger.info "Started child #{inspect pid} to handle #{inspect client}"
     pid
   end
 
-  defp begin(client, primary) do
+  defp begin(client, primary, fallback) do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: true, reuseaddr: true])
-    serve(client, primary, socket)
+    serve(client, primary, fallback, socket, %{})
   end
 
-  defp serve(client, primary, dns_socket) do
+  defp serve(client, primary, fallback, dns_socket, buffer) do
     {socket, addr, port} = client
-    {dns_addr, dns_port} = primary
-    loop? = receive do
-      {:udp, ^dns_socket, _dns_addr, _dns_port, packet} ->
-        Logger.info "#{inspect self()} received #{inspect packet} from dns"
-        :ok = :gen_udp.send(socket, addr, port, packet)
-        Logger.info "#{inspect self()} #{inspect packet} sent back to client"
-        true
+    {prim_addr, prim_port} = primary
+    {fall_addr, fall_port} = fallback
+    buffer = receive do
+      {:udp, ^dns_socket, ^prim_addr, ^prim_port, packet} ->
+        unless nxdomain?(packet) do
+          :ok = :gen_udp.send(socket, addr, port, packet)
+          Logger.info "#{inspect self()} - sent back primary"
+          Map.delete(buffer, id(packet))
+        else
+          status = Map.get(buffer, id(packet))
+          case status do
+            :sent -> Map.put(buffer, id(packet), :nxdomain)
+            {:fallback, msg} ->
+              :ok = :gen_udp.send(socket, addr, port, msg)
+              Logger.info "#{inspect self()} - sent back fallback [2]"
+              Map.delete(buffer, id(packet))
+          end
+        end
+      {:udp, ^dns_socket, ^fall_addr, ^fall_port, packet} ->
+        status = Map.get(buffer, id(packet))
+        case status do
+          nil -> buffer
+          :sent -> Map.put(buffer, id(packet), {:fallback, packet})
+          :nxdomain ->
+            :ok = :gen_udp.send(socket, addr, port, packet)
+            Logger.info "#{inspect self()} - sent back fallback [1]"
+            Map.delete(buffer, id(packet))
+        end
       msg ->
-        Logger.info "#{inspect self()} received #{inspect msg}"
-        :ok = :gen_udp.send(dns_socket, dns_addr, dns_port, msg)
-        Logger.info "#{inspect self()} #{inspect msg} sent to DNS"
-        true
+        :ok = :gen_udp.send(dns_socket, prim_addr, prim_port, msg)
+        :ok = :gen_udp.send(dns_socket, fall_addr, fall_port, msg)
+        Logger.info "#{inspect self()} received #{inspect msg} & sent to DNSs"
+        Map.put(buffer, id(msg), :sent)
     after 5_000 ->
       :ok = :gen_udp.close(dns_socket)
       Logger.info "#{inspect self()} exiting…"
-      false
+      nil
     end
-    if loop?, do: serve(client, primary, dns_socket)
+    IO.puts (inspect buffer)
+    if buffer != nil, do: serve(client, primary, fallback, dns_socket, buffer)
+  end
+
+  defp id(packet) do
+    NXRedirect.Dns.Header.header(packet).id
+  end
+
+  defp nxdomain?(packet) do
+    NXRedirect.Dns.Header.header(packet).rcode == << 3::size(4) >>
+  end
+end
+
+defmodule NXRedirect.Dns.Header do
+  defstruct id:      <<>>,
+            qr:      <<>>,
+            opcode:  <<>>,
+            aa:      <<>>,
+            tc:      <<>>,
+            rd:      <<>>,
+            ra:      <<>>,
+            z:       <<>>,
+            rcode:   <<>>,
+            qdcnt:   <<>>,
+            ancnt:   <<>>,
+            nscnt:   <<>>,
+            arcnt:   <<>>
+
+  def header(packet) do
+    <<
+      id        :: bytes-size(2),
+      qr        :: bits-size(1),
+      opcode    :: bits-size(4),
+      aa        :: bits-size(1),
+      tc        :: bits-size(1),
+      rd        :: bits-size(1),
+      ra        :: bits-size(1),
+      z         :: bits-size(3),
+      rcode     :: bits-size(4),
+      qdcnt     :: unsigned-integer-size(16),
+      ancnt     :: unsigned-integer-size(16),
+      nscnt     :: unsigned-integer-size(16),
+      arcnt     :: unsigned-integer-size(16),
+      _payload  :: binary
+    >> = packet
+    %NXRedirect.Dns.Header{
+      id:     id,
+      qr:     qr,
+      opcode: opcode,
+      aa:     aa,
+      tc:     tc,
+      rd:     rd,
+      ra:     ra,
+      z:      z,
+      rcode:  rcode,
+      qdcnt:  qdcnt,
+      ancnt:  ancnt,
+      nscnt:  nscnt,
+      arcnt:  arcnt
+    }
   end
 end
