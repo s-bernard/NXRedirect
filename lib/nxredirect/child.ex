@@ -9,6 +9,8 @@ defmodule NXRedirect.Child do
   def start(client, primary, fallback) do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: true, reuseaddr: true])
     serve(client, primary, fallback, socket, %{})
+    :ok = :gen_udp.close(socket)
+    Logger.info "#{inspect self()} exiting…"
   end
 
   defp serve(client, primary, fallback, dns_socket, buffer) do
@@ -46,10 +48,7 @@ defmodule NXRedirect.Child do
         :ok = :gen_udp.send(dns_socket, fall_addr, fall_port, msg)
         Logger.info "#{inspect self()} received #{inspect msg} & sent to DNSs"
         Map.put(buffer, id(msg), :sent)
-    after 5_000 ->
-      :ok = :gen_udp.close(dns_socket)
-      Logger.info "#{inspect self()} exiting…"
-      nil
+    after 5_000 -> nil
     end
     IO.puts (inspect buffer)
     if buffer != nil, do: serve(client, primary, fallback, dns_socket, buffer)

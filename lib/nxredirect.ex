@@ -14,16 +14,14 @@ defmodule NXRedirect do
   @doc false
   def start(_type, _args) do
     import Supervisor.Spec
-    Logger.info "Start application!"
-
     children = [
       supervisor(Task.Supervisor, [[name: NXRedirect.TaskSupervisor]]),
       worker(Task, [
-        Parent, :accept, [get_port(), get_primary(), get_fallback()]
+        Parent, :start, [get_port(), get_primary(), get_fallback()]
       ])
     ]
-
     opts = [strategy: :one_for_one, name: NXRedirect.Supervisor]
+    Logger.info "Starting NXRedirect application!"
     Supervisor.start_link(children, opts)
   end
 

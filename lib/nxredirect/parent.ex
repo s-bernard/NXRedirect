@@ -9,12 +9,11 @@ defmodule NXRedirect.Parent do
   @doc """
   Starts accepting connections on the given `port`.
   """
-  def accept(port, primary, fallback) do
+  def start(port, primary, fallback) do
     {:ok, _socket} = :gen_udp.open(
       port,
       [:binary, active: true, reuseaddr: true]
     )
-    Logger.info "Test in"
     recv_main(primary, fallback, %{}, %{})
   end
 
