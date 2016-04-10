@@ -25,12 +25,12 @@ defmodule NXRedirect.Parent do
         {pid, clients, refs} = case Map.fetch(clients, client) do
           {:ok, pid} -> {pid, clients, refs}
           :error ->
-            pid = start_child(client, primary, fallback)
+            pid = start_child(:udp, client, primary, fallback)
             clients = Map.put(clients, client, pid)
             refs = Map.put(refs, Process.monitor(pid), client)
             {pid, clients, refs}
         end
-        send pid, packet
+        send(pid, {:udp, socket, addr, port, packet})
         {clients, refs}
       {:DOWN, ref, :process, pid, _} ->
         {client, refs} = Map.pop(refs, ref)
@@ -44,10 +44,10 @@ defmodule NXRedirect.Parent do
     recv_main(primary, fallback, clients, refs)
   end
 
-  defp start_child(client, primary, fallback) do
+  defp start_child(protocol, client, primary, fallback) do
     {:ok, pid} = Task.Supervisor.start_child(
       NXRedirect.TaskSupervisor,
-      fn -> Child.start(client, primary, fallback) end
+      fn -> Child.start(protocol, client, primary, fallback) end
     )
     Logger.info "Started child #{inspect pid} to handle #{inspect client}"
     pid
