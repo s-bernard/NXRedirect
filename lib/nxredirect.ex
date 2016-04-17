@@ -17,12 +17,22 @@ defmodule NXRedirect do
     children = [
       supervisor(Task.Supervisor, [[name: NXRedirect.TaskSupervisor]]),
       worker(Task, [
-        Parent, :start, [get_port(), get_primary(), get_fallback()]
+        Parent, :start, [get_port(), get_addresses()]
       ])
     ]
     opts = [strategy: :one_for_one, name: NXRedirect.Supervisor]
     Logger.info "Starting NXRedirect application!"
     Supervisor.start_link(children, opts)
+  end
+
+  defp get_addresses do
+    primary = get_primary()
+    fallback = get_fallback()
+    addresses = Map.new()
+    addresses = Map.put(addresses, :primary, primary)
+    addresses = Map.put(addresses, primary, :primary)
+    addresses = Map.put(addresses, :fallback, fallback)
+    Map.put(addresses, fallback, :fallback)
   end
 
   defp get_primary do

@@ -6,18 +6,33 @@ defmodule NXRedirect.Child do
   alias NXRedirect.DNSHeader, as: DNSHeader
   require Logger
 
-  def start(:udp, client, primary, fallback) do
-    {:ok, socket} = :gen_udp.open(0, [:binary, active: true, reuseaddr: true])
+  def start(:tcp, socket, addresses) do
     me = self
+    pid = spawn_link(fn() -> start_main(:tcp, me, addresses) end)
     Process.flag(:trap_exit, true)
-    main_pid = spawn_link(fn() -> start_main(socket, me, primary, fallback) end)
-    diplomat(client, primary, fallback, {socket, main_pid})
+    :inet.setopts(socket, [active: :once])
+    diplomat(socket, pid, {:client, :tcp}, %{})
   end
 
-  defp start_main(socket, client_pid, primary, fallback) do
+  def start(:udp, client_socket, addresses) do
+    options = [:binary, active: true, reuseaddr: true]
+    {:ok, socket} = :gen_udp.open(0, options)
+    me = self
+    pid = spawn_link(fn() -> start_main(socket, me, addresses) end)
+    dest = Map.fetch!(addresses, :client)
+    diplomat(client_socket, pid, {:client, dest}, addresses)
+  end
+
+  defp start_main(socket, client_pid, addresses) do
     main_pid = self
-    primary_pid = spawn_link(fn() -> diplomat(socket, primary, main_pid) end)
-    fallback_pid = spawn_link(fn() -> diplomat(socket, fallback, main_pid) end)
+    launch = fn(client) ->
+      spawn_link(fn() ->
+        Process.flag(:trap_exit, true)
+        dest = Map.fetch!(addresses, client)
+        diplomat(socket, main_pid, {client, dest}, %{})
+      end)
+    end
+    [primary_pid, fallback_pid] = Enum.map([:primary, :fallback], launch)
     main(client_pid, primary_pid, fallback_pid, %{})
   end
 
@@ -29,6 +44,7 @@ defmodule NXRedirect.Child do
         send(fallback, {self, message})
         Map.put(state, id(message), :forwarded)
       {:primary, message} ->
+        Logger.debug "#{inspect self()}: received reply from primary"
         if nxdomain?(message) do
           status = Map.get(state, id(message))
           case status do
@@ -45,9 +61,11 @@ defmodule NXRedirect.Child do
           Map.delete(state, id(message))
         end
       {:fallback, message} ->
+        Logger.debug "#{inspect self()}: received reply from fallback"
         status = Map.get(state, id(message))
         case status do
-          :forwarded -> Map.put(state, id(message), {:fallback, message})
+          :forwarded ->
+            Map.put(state, id(message), {:fallback, message})
           :nxdomain ->
             Logger.debug "#{inspect self()}: sent back fallback [2]"
             send(client, {self, message})
@@ -55,45 +73,55 @@ defmodule NXRedirect.Child do
           _ -> state
         end
       msg ->
-        Logger.warn("#{inspect self()}: discarding #{inspect msg}")
+        Logger.warn("#{inspect self()}(main): discarding #{inspect msg}")
         state
-    after 5_000 -> exit(:timeout)
+    after 5_000 ->
+      Logger.info("#{inspect self()}(main): timeout…")
+      exit(:timeout)
     end
     main(client, primary, fallback, state)
   end
 
-  defp diplomat(socket, {addr, port}, pid) do
-    receive do
-      {^pid, message} -> :gen_udp.send(socket, addr, port, message)
-      msg -> Logger.warn("#{inspect self()}: discarding #{inspect msg}")
-    end
-    diplomat(socket, {addr, port}, pid)
+  defp diplomat(:tcp, pid, {client, {addr, port}}, addresses) do
+    Process.flag(:trap_exit, true)
+    options = [:binary, packet: 2, active: :once, reuseaddr: true]
+    {:ok, socket} = :gen_tcp.connect(addr, port, options)
+    diplomat(socket, pid, {client, :tcp}, addresses)
   end
 
-  defp diplomat(client, primary, fallback, main_infos) do
-    {client_socket, client_addr, client_port} = client
-    {prim_addr, prim_port} = primary
-    {fall_addr, fall_port} = fallback
-    {socket, pid} = main_infos
+  defp diplomat(socket, pid, {client, dest}, addresses) do
     receive do
-      {:udp, ^client_socket, ^client_addr, ^client_port, message} ->
-        send(pid, {:client, message})
-      {:udp, ^socket, ^prim_addr, ^prim_port, message} ->
-        send(pid, {:primary, message})
-      {:udp, ^socket, ^fall_addr, ^fall_port, message} ->
-        send(pid, {:fallback, message})
-      {^pid, message} ->
-        :ok = :gen_udp.send(client_socket, client_addr, client_port, message)
-      {:EXIT, ^pid, _} -> exiting(socket)
-      msg -> Logger.warn("#{inspect self()}: discarding #{inspect msg}")
+      {^pid, message} -> netsend(socket, message, dest)
+      {:tcp, ^socket, message} ->
+        send(pid, {client, message})
+        :inet.setopts(socket, [active: :once])
+      {:tcp_closed, ^socket} -> exit(:normal)
+      {:udp, _, addr, port, message} ->
+        from = Map.fetch!(addresses, {addr, port})
+        send(pid, {from, message})
+      {:EXIT, ^pid, _} -> exiting(socket, dest)
+      msg ->
+        Logger.warn("#{inspect self()}(#{client}): discarding #{inspect msg}")
     end
-    diplomat(client, primary, fallback, main_infos)
+    diplomat(socket, pid, {client, dest}, addresses)
   end
 
-  defp exiting(socket) do
-    :ok = :gen_udp.close(socket)
-    Logger.debug "#{inspect self()} exiting…"
+  defp exiting(socket, :tcp) do
+    :gen_tcp.close(socket)
     exit(:normal)
+  end
+
+  defp exiting(socket, _) do
+    :gen_udp.close(socket)
+    exit(:normal)
+  end
+
+  defp netsend(socket, message, :tcp) do
+    :ok = :gen_tcp.send(socket, message)
+  end
+
+  defp netsend(socket, message, {addr, port}) do
+    :ok = :gen_udp.send(socket, addr, port, message)
   end
 
   defp id(packet) do
