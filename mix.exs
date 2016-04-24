@@ -9,6 +9,7 @@ defmodule NXRedirect.Mixfile do
      package: package,
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     escript: escript,
      deps: deps]
   end
 
@@ -18,6 +19,10 @@ defmodule NXRedirect.Mixfile do
   def application do
     [applications: [:logger],
      mod: {NXRedirect, []}]
+  end
+
+  def escript do
+    [main_module: NXRedirect]
   end
 
   # Dependencies can be Hex packages:
