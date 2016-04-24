@@ -1,0 +1,38 @@
+before_script:
+  - mix deps.get && mix deps.compile
+
+dogma:
+  tags:
+    - mix
+  script:
+    - mix dogma
+
+credo:
+  tags:
+    - mix
+  script:
+    - mix credo --strict
+
+test:
+  tags:
+    - mix
+  script:
+    - mix test
+
+lines_length:
+  before_script:
+    - 'true'
+  script:
+    - >
+      curl https://gitlab.com/s4m/checks/raw/master/check_lines_length.sh |
+      bash
+
+git_history:
+  tags:
+    - git
+  before_script:
+    - 'true'
+  script:
+    - >
+      curl https://gitlab.com/s4m/checks/raw/master/check_git_history.sh |
+      bash
