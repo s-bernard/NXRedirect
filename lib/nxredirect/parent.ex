@@ -73,7 +73,7 @@ defmodule NXRedirect.Parent do
       NXRedirect.TaskSupervisor,
       fn -> Child.start(protocol, socket, addresses) end
     )
-    Logger.info "Started child #{inspect pid} to handle #{inspect {addr, port}}"
+    Logger.info "Started #{inspect pid} to handle #{inspect {addr, port}}"
     pid
   end
 end
