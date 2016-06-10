@@ -32,7 +32,8 @@ defmodule NXRedirect.Mixfile do
     [
       {:credo, ">= 0.0.0", only: [:dev, :test]},
       {:dogma, ">= 0.0.0", only: [:dev, :test]},
-      {:dialyxir, ">= 0.0.0", only: [:dev, :test]}
+      {:dialyxir, ">= 0.0.0", only: [:dev, :test]},
+      {:exrm, ">= 0.0.0"}
     ]
   end
 
