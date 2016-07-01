@@ -22,9 +22,9 @@ use Mix.Config
 #
 
 config :nxredirect,
-  primary: {'127.0.0.1', 5353},
+  primary: {'127.0.0.1', 53},
   fallback: {'8.8.8.8', 53},
-  port: 53
+  port: 53053
 
 # It is also possible to import configuration files, relative to this
 # directory. For example, you can emulate configuration per environment
