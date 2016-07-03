@@ -14,14 +14,20 @@ defmodule NXRedirect do
   @doc false
   def start(_type, _args) do
     import Supervisor.Spec
+    port = get_port()
+    addresses = get_addresses()
     children = [
       supervisor(Task.Supervisor, [[name: NXRedirect.TaskSupervisor]]),
       worker(Task, [
-        Parent, :start, [get_port(), get_addresses()]
+        Parent, :start, [port, addresses]
       ])
     ]
     opts = [strategy: :one_for_one, name: NXRedirect.Supervisor]
     Logger.info "Starting NXRedirect application!"
+    Logger.info "Configuration:
+     - port: #{port}
+     - primary: #{inspect(Map.get(addresses,:primary))}
+     - fallback: #{inspect(Map.get(addresses,:fallback))}"
     Supervisor.start_link(children, opts)
   end
 
