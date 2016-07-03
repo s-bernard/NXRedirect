@@ -22,7 +22,8 @@ defmodule NXRedirect.Mixfile do
   end
 
   def escript do
-    [main_module: NXRedirect]
+    [main_module: NXRedirect,
+     app: nil]
   end
 
   # Dependencies can be Hex packages:

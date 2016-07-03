@@ -11,6 +11,20 @@ defmodule NXRedirect do
   Record.defrecord :hostent,
     Record.extract(:hostent, from_lib: "kernel/include/inet.hrl")
 
+  def main(args) do
+    {parsed, _, _} = OptionParser.parse(args)
+    add_config(parsed)
+    Application.ensure_all_started(:nxredirect)
+    :timer.sleep(:infinity)
+  end
+
+  def add_config([]), do: :ok
+
+  def add_config([{key, value} | tail]) do
+    Application.put_env(:nxredirect, key, value, persistent: true)
+    add_config(tail)
+  end
+
   @doc false
   def start(_type, _args) do
     import Supervisor.Spec
@@ -50,11 +64,18 @@ defmodule NXRedirect do
   end
 
   defp parse_host(host_port) do
+    host_port = if is_binary(host_port) do
+      [host, port] = String.split(host_port, ":")
+      {to_char_list(host), String.to_integer(port)}
+    else
+      host_port
+    end
     {:ok, addr} = :inet.parse_address(elem(host_port, 0))
     {addr, elem(host_port, 1)}
   end
 
   defp get_port do
-    Application.get_env(:nxredirect, :port)
+    port = Application.get_env(:nxredirect, :port)
+    if is_binary(port), do: String.to_integer(port), else: port
   end
 end
