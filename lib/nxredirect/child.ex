@@ -20,6 +20,7 @@ defmodule NXRedirect.Child do
     me = self
     pid = spawn_link(fn() -> start_main(socket, me, addresses) end)
     dest = Map.fetch!(addresses, :client)
+    Process.flag(:trap_exit, true)
     diplomat(client_socket, pid, {:client, dest}, addresses)
   end
 
@@ -111,8 +112,7 @@ defmodule NXRedirect.Child do
     exit(:normal)
   end
 
-  defp exiting(socket, _) do
-    :gen_udp.close(socket)
+  defp exiting(_socket, _) do
     exit(:normal)
   end
 
