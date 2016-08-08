@@ -38,10 +38,7 @@ defmodule NXRedirect do
     ]
     opts = [strategy: :one_for_one, name: NXRedirect.Supervisor]
     Logger.info "Starting NXRedirect application!"
-    Logger.info "Configuration:
-     - port: #{port}
-     - primary: #{inspect(Map.get(addresses,:primary))}
-     - fallback: #{inspect(Map.get(addresses,:fallback))}"
+    Logger.info printable_config(addresses, port)
     Supervisor.start_link(children, opts)
   end
 
@@ -77,5 +74,17 @@ defmodule NXRedirect do
   defp get_port do
     port = Application.get_env(:nxredirect, :port)
     if is_binary(port), do: String.to_integer(port), else: port
+  end
+
+  defp printable_config(addresses, port) do
+    "Configuration:
+    - port: #{port}
+    - primary: #{printable_address(Map.get(addresses, :primary))}
+    - fallback: #{printable_address(Map.get(addresses, :fallback))}"
+  end
+
+  defp printable_address(address) do
+    {ip, port} = address
+    "#{:inet.ntoa(ip)}:#{port}"
   end
 end

@@ -12,6 +12,9 @@ config :logger,
   utc_log: true,
   compile_time_purge_level: if Mix.env == :prod, do: :info, else: :debug
 
+# primary and fallback addresses can also be formated in string:
+# primary: "127.0.0.1:53",
+# fallback: "8.8.8.8:53",
 config :nxredirect,
   primary: {'127.0.0.1', 53},
   fallback: {'8.8.8.8', 53},
