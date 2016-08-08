@@ -8,18 +8,9 @@ use Mix.Config
 # if you want to provide default values for your application for
 # 3rd-party users, it should be done in your "mix.exs" file.
 
-# You can configure for your application as:
-#
-#     config :nxredirect, key: :value
-#
-# And access this configuration in your application as:
-#
-#     Application.get_env(:nxredirect, :key)
-#
-# Or configure a 3rd-party app:
-#
-#     config :logger, level: :info
-#
+config :logger,
+  utc_log: true,
+  compile_time_purge_level: if Mix.env == :prod, do: :info, else: :debug
 
 config :nxredirect,
   primary: {'127.0.0.1', 53},

@@ -77,7 +77,7 @@ defmodule NXRedirect.Child do
         Logger.warn("#{inspect self()}(main): discarding #{inspect msg}")
         state
     after 5_000 ->
-      Logger.info("#{inspect self()}(main): timeout…")
+      Logger.debug("#{inspect self()}(main): timeout…")
       exit(:timeout)
     end
     main(client, primary, fallback, state)
