@@ -1,21 +1,18 @@
+image: elixir
+
 before_script:
+  - mix local.hex --force
   - mix deps.get && mix deps.compile
 
 dogma:
-  tags:
-    - mix
   script:
     - mix dogma
 
 credo:
-  tags:
-    - mix
   script:
     - mix credo --strict
 
 test:
-  tags:
-    - mix
   script:
     - mix test
 
@@ -25,11 +22,9 @@ lines_length:
   script:
     - >
       curl https://gitlab.com/s4m/checks/raw/master/check_lines_length.sh |
-      bash
+      bash -s -- 80 'mix\.lock'
 
 git_history:
-  tags:
-    - git
   before_script:
     - 'true'
   script:
