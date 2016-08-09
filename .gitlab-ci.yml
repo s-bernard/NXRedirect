@@ -1,20 +1,12 @@
 image: elixir
 
+stages:
+  - test
+  - deploy
+
 before_script:
   - mix local.hex --force
   - mix deps.get && mix deps.compile
-
-dogma:
-  script:
-    - mix dogma
-
-credo:
-  script:
-    - mix credo --strict
-
-test:
-  script:
-    - mix test
 
 lines_length:
   before_script:
@@ -31,3 +23,24 @@ git_history:
     - >
       curl https://gitlab.com/s4m/checks/raw/master/check_git_history.sh |
       bash
+
+dogma:
+  script:
+    - mix dogma
+
+credo:
+  script:
+    - mix credo --strict
+
+test:
+  script:
+    - mix test
+
+nxredirect:
+  stage: deploy
+  script:
+    - MIX_ENV=prod mix escript.build
+  artifacts:
+    paths:
+      - nxredirect
+    name: "$CI_BUILD_NAME"
