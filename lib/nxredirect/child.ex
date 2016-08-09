@@ -37,6 +37,7 @@ defmodule NXRedirect.Child do
     main(client_pid, primary_pid, fallback_pid, %{})
   end
 
+  @lint {Credo.Check.Refactor.ABCSize, false}
   defp main(client, primary, fallback, state) do
     state = receive do
       {:client, message} ->
@@ -90,6 +91,7 @@ defmodule NXRedirect.Child do
     diplomat(socket, pid, {client, :tcp}, addresses)
   end
 
+  @lint {Credo.Check.Refactor.ABCSize, false}
   defp diplomat(socket, pid, {client, dest}, addresses) do
     receive do
       {^pid, message} -> netsend(socket, message, dest)

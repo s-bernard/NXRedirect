@@ -40,29 +40,33 @@ defmodule NXRedirect.Parent do
       {:udp, socket, addr, port, packet} ->
         client = {socket, addr, port}
         Logger.debug "MAIN: Get #{inspect packet} from #{inspect addr}:#{port}"
-        {pid, clients, refs} = client_pid(addresses, refs, clients, client)
-        send(pid, {:udp, socket, addr, port, packet})
-        {clients, refs}
+        client_pid(addresses, refs, clients, {client, packet})
       {:DOWN, ref, :process, pid, _} ->
-        {client, refs} = Map.pop(refs, ref)
-        {^pid, clients} = Map.pop(clients, client)
-        Logger.debug "MAIN: Drop #{inspect client}:#{inspect pid}"
-        {clients, refs}
+        drop_client(refs, clients, ref, pid)
       msg ->
-        Logger.debug "MAIN: Ignoring #{inspect msg}"
+        Logger.warn "MAIN: Ignoring #{inspect msg}"
         {clients, refs}
     end
     recv_udp(addresses, clients, refs)
   end
 
-  defp client_pid(addresses, refs, clients, client) do
+  defp drop_client(refs, clients, ref, pid) do
+    {client, refs} = Map.pop(refs, ref)
+    {^pid, clients} = Map.pop(clients, client)
+    Logger.debug "MAIN: Drop #{inspect client}:#{inspect pid}"
+    {clients, refs}
+  end
+
+  defp client_pid(addresses, refs, clients, {client, packet}) do
+    {socket, addr, port} = client
     case Map.fetch(clients, client) do
       {:ok, pid} -> {pid, clients, refs}
       :error ->
         pid = start_child(:udp, client, addresses)
         clients = Map.put(clients, client, pid)
         refs = Map.put(refs, Process.monitor(pid), client)
-        {pid, clients, refs}
+        send(pid, {:udp, socket, addr, port, packet})
+        {clients, refs}
     end
   end
 
