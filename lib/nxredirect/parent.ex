@@ -59,15 +59,16 @@ defmodule NXRedirect.Parent do
 
   defp client_pid(addresses, refs, clients, {client, packet}) do
     {socket, addr, port} = client
-    case Map.fetch(clients, client) do
+    {pid, clients, refs} = case Map.fetch(clients, client) do
       {:ok, pid} -> {pid, clients, refs}
       :error ->
         pid = start_child(:udp, client, addresses)
         clients = Map.put(clients, client, pid)
         refs = Map.put(refs, Process.monitor(pid), client)
-        send(pid, {:udp, socket, addr, port, packet})
-        {clients, refs}
+        {pid, clients, refs}
     end
+    send(pid, {:udp, socket, addr, port, packet})
+    {clients, refs}
   end
 
   defp start_child(protocol, {socket, addr, port}, addresses) do
