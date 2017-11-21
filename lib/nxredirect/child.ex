@@ -7,7 +7,7 @@ defmodule NXRedirect.Child do
   require Logger
 
   def start(:tcp, socket, addresses) do
-    me = self
+    me = self()
     pid = spawn_link(fn() -> start_main(:tcp, me, addresses) end)
     Process.flag(:trap_exit, true)
     :inet.setopts(socket, [active: :once])
@@ -17,7 +17,7 @@ defmodule NXRedirect.Child do
   def start(:udp, client_socket, addresses) do
     options = [:binary, active: true, reuseaddr: true]
     {:ok, socket} = :gen_udp.open(0, options)
-    me = self
+    me = self()
     pid = spawn_link(fn() -> start_main(socket, me, addresses) end)
     dest = Map.fetch!(addresses, :client)
     Process.flag(:trap_exit, true)
@@ -25,7 +25,7 @@ defmodule NXRedirect.Child do
   end
 
   defp start_main(socket, client_pid, addresses) do
-    main_pid = self
+    main_pid = self()
     launch = fn(client) ->
       spawn_link(fn() ->
         Process.flag(:trap_exit, true)
@@ -37,13 +37,13 @@ defmodule NXRedirect.Child do
     main(client_pid, primary_pid, fallback_pid, %{})
   end
 
-  @lint {Credo.Check.Refactor.ABCSize, false}
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp main(client, primary, fallback, state) do
     state = receive do
       {:client, message} ->
-        Logger.debug "#{inspect self}: forward #{inspect id(message)}"
-        send(primary, {self, message})
-        send(fallback, {self, message})
+        Logger.debug "#{inspect self()}: forward #{inspect id(message)}"
+        send(primary, {self(), message})
+        send(fallback, {self(), message})
         Map.put(state, id(message), :forwarded)
       {:primary, message} ->
         Logger.debug "#{inspect self()}: received reply from primary"
@@ -53,13 +53,13 @@ defmodule NXRedirect.Child do
             :forwarded -> Map.put(state, id(message), :nxdomain)
             {:fallback, fallback_message} ->
               Logger.debug "#{inspect self()}: sent back fallback [1]"
-              send(client, {self, fallback_message})
+              send(client, {self(), fallback_message})
               Map.delete(state, id(message))
             _ -> state # ignore message
           end
         else
           Logger.debug "#{inspect self()}: sent back primary"
-          send(client, {self, message})
+          send(client, {self(), message})
           Map.delete(state, id(message))
         end
       {:fallback, message} ->
@@ -70,7 +70,7 @@ defmodule NXRedirect.Child do
             Map.put(state, id(message), {:fallback, message})
           :nxdomain ->
             Logger.debug "#{inspect self()}: sent back fallback [2]"
-            send(client, {self, message})
+            send(client, {self(), message})
             Map.delete(state, id(message))
           _ -> state
         end
@@ -91,7 +91,7 @@ defmodule NXRedirect.Child do
     diplomat(socket, pid, {client, :tcp}, addresses)
   end
 
-  @lint {Credo.Check.Refactor.ABCSize, false}
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp diplomat(socket, pid, {client, dest}, addresses) do
     receive do
       {^pid, message} -> netsend(socket, message, dest)

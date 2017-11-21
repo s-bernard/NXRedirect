@@ -63,7 +63,7 @@ defmodule NXRedirect do
   defp parse_host(host_port) do
     host_port = if is_binary(host_port) do
       [host, port] = String.split(host_port, ":")
-      {to_char_list(host), String.to_integer(port)}
+      {to_charlist(host), String.to_integer(port)}
     else
       host_port
     end
