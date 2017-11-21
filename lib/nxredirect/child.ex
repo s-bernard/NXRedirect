@@ -41,35 +41,47 @@ defmodule NXRedirect.Child do
   defp main(client, primary, fallback, state) do
     state = receive do
       {:client, message} ->
-        Logger.debug "#{inspect self()}: forward #{inspect id(message)}"
+        Logger.debug fn ->
+          "#{inspect self()}: forward #{inspect id(message)}"
+        end
         send(primary, {self(), message})
         send(fallback, {self(), message})
         Map.put(state, id(message), :forwarded)
       {:primary, message} ->
-        Logger.debug "#{inspect self()}: received reply from primary"
+        Logger.debug fn ->
+          "#{inspect self()}: received reply from primary"
+        end
         if nxdomain?(message) do
           status = Map.get(state, id(message))
           case status do
             :forwarded -> Map.put(state, id(message), :nxdomain)
             {:fallback, fallback_message} ->
-              Logger.debug "#{inspect self()}: sent back fallback [1]"
+              Logger.debug fn ->
+                "#{inspect self()}: sent back fallback [1]"
+              end
               send(client, {self(), fallback_message})
               Map.delete(state, id(message))
             _ -> state # ignore message
           end
         else
-          Logger.debug "#{inspect self()}: sent back primary"
+          Logger.debug fn ->
+            "#{inspect self()}: sent back primary"
+          end
           send(client, {self(), message})
           Map.delete(state, id(message))
         end
       {:fallback, message} ->
-        Logger.debug "#{inspect self()}: received reply from fallback"
+        Logger.debug fn ->
+          "#{inspect self()}: received reply from fallback"
+        end
         status = Map.get(state, id(message))
         case status do
           :forwarded ->
             Map.put(state, id(message), {:fallback, message})
           :nxdomain ->
-            Logger.debug "#{inspect self()}: sent back fallback [2]"
+            Logger.debug fn ->
+              "#{inspect self()}: sent back fallback [2]"
+            end
             send(client, {self(), message})
             Map.delete(state, id(message))
           _ -> state
@@ -78,7 +90,9 @@ defmodule NXRedirect.Child do
         Logger.warn("#{inspect self()}(main): discarding #{inspect msg}")
         state
     after 5_000 ->
-      Logger.debug("#{inspect self()}(main): timeout…")
+      Logger.debug fn ->
+        "#{inspect self()}(main): timeout…"
+      end
       exit(:timeout)
     end
     main(client, primary, fallback, state)

@@ -11,7 +11,9 @@ defmodule NXRedirect.Parent do
   """
   def start(port, addresses) do
     pid = spawn_link(fn() -> accept(port, addresses) end)
-    Logger.debug "Launched #{inspect pid} to handle TCP requests"
+    Logger.debug fn ->
+      "Launched #{inspect pid} to handle TCP requests"
+    end
     {:ok, _socket} = :gen_udp.open(
       port,
       [:binary, active: true, reuseaddr: true]
@@ -22,14 +24,18 @@ defmodule NXRedirect.Parent do
   defp accept(port, addresses) do
     options = [:binary, packet: 2, active: false, reuseaddr: true]
     {:ok, socket} = :gen_tcp.listen(port, options)
-    Logger.debug "Accepting connections on port #{port}"
+    Logger.debug fn ->
+      "Accepting connections on port #{port}"
+    end
     loop_acceptor(socket, addresses)
   end
 
   defp loop_acceptor(socket, addresses) do
     {:ok, client_socket} = :gen_tcp.accept(socket)
     {:ok, {addr, port}} = :inet.peername(client_socket)
-    Logger.debug "Receive connection from #{inspect {addr, port}}"
+    Logger.debug fn ->
+      "Receive connection from #{inspect {addr, port}}"
+    end
     pid = start_child(:tcp, {client_socket, addr, port}, addresses)
     :ok = :gen_tcp.controlling_process(client_socket, pid)
     loop_acceptor(socket, addresses)
@@ -39,7 +45,9 @@ defmodule NXRedirect.Parent do
     {clients, refs} = receive do
       {:udp, socket, addr, port, packet} ->
         client = {socket, addr, port}
-        Logger.debug "MAIN: Get #{inspect packet} from #{inspect addr}:#{port}"
+        Logger.debug fn ->
+          "MAIN: Get #{inspect packet} from #{inspect addr}:#{port}"
+        end
         client_pid(addresses, refs, clients, {client, packet})
       {:DOWN, ref, :process, pid, _} ->
         drop_client(refs, clients, ref, pid)
@@ -53,7 +61,9 @@ defmodule NXRedirect.Parent do
   defp drop_client(refs, clients, ref, pid) do
     {client, refs} = Map.pop(refs, ref)
     {^pid, clients} = Map.pop(clients, client)
-    Logger.debug "MAIN: Drop #{inspect client}:#{inspect pid}"
+    Logger.debug fn ->
+      "MAIN: Drop #{inspect client}:#{inspect pid}"
+    end
     {clients, refs}
   end
 
@@ -78,7 +88,9 @@ defmodule NXRedirect.Parent do
       NXRedirect.TaskSupervisor,
       fn -> Child.start(protocol, socket, addresses) end
     )
-    Logger.debug "Started #{inspect pid} to handle #{inspect {addr, port}}"
+    Logger.debug fn ->
+      "Started #{inspect pid} to handle #{inspect {addr, port}}"
+    end
     pid
   end
 end
