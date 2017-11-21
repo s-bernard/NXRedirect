@@ -8,12 +8,15 @@ before_script:
   - mix local.hex --force
   - mix deps.get && mix deps.compile
 
+variables:
+  CHECKS_REPO: https://gitlab.com/samuel.bernard/checks/raw/master
+
 lines_length:
   before_script:
     - 'true'
   script:
     - >
-      curl https://gitlab.com/s4m/checks/raw/master/check_lines_length.sh |
+      curl $CHECKS_REPO/check_lines_length.sh |
       bash -s -- 80 'mix\.lock'
 
 git_history:
@@ -21,7 +24,7 @@ git_history:
     - 'true'
   script:
     - >
-      curl https://gitlab.com/s4m/checks/raw/master/check_git_history.sh |
+      curl $CHECKS_REPO/check_git_history.sh |
       bash
 
 dogma:
