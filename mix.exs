@@ -4,7 +4,7 @@ defmodule NXRedirect.Mixfile do
   def project do
     [app: :nxredirect,
      version: "1.0.0",
-     elixir: "~> 1.3",
+     elixir: "~> 1.5",
      description: description,
      package: package,
      build_embedded: Mix.env == :prod,
