@@ -5,12 +5,12 @@ defmodule NXRedirect.Mixfile do
     [app: :nxredirect,
      version: "1.0.0",
      elixir: "~> 1.5",
-     description: description,
-     package: package,
+     description: description(),
+     package: package(),
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     escript: escript,
-     deps: deps]
+     escript: escript(),
+     deps: deps()]
   end
 
   # Configuration for the OTP application
