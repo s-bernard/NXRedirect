@@ -27,10 +27,6 @@ git_history:
       curl $CHECKS_REPO/check_git_history.sh |
       bash
 
-dogma:
-  script:
-    - mix dogma
-
 credo:
   script:
     - mix credo --strict
