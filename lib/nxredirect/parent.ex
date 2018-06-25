@@ -10,73 +10,94 @@ defmodule NXRedirect.Parent do
   Starts accepting connections on the given `port`.
   """
   def start(port, addresses) do
-    pid = spawn_link(fn() -> accept(port, addresses) end)
-    Logger.debug fn ->
-      "Launched #{inspect pid} to handle TCP requests"
-    end
-    {:ok, _socket} = :gen_udp.open(
-      port,
-      [:binary, active: true, reuseaddr: true]
-    )
+    pid = spawn_link(fn -> accept(port, addresses) end)
+
+    Logger.debug(fn ->
+      "Launched #{inspect(pid)} to handle TCP requests"
+    end)
+
+    {:ok, _socket} =
+      :gen_udp.open(
+        port,
+        [:binary, active: true, reuseaddr: true]
+      )
+
     recv_udp(addresses, %{}, %{})
   end
 
   defp accept(port, addresses) do
     options = [:binary, packet: 2, active: false, reuseaddr: true]
     {:ok, socket} = :gen_tcp.listen(port, options)
-    Logger.debug fn ->
+
+    Logger.debug(fn ->
       "Accepting connections on port #{port}"
-    end
+    end)
+
     loop_acceptor(socket, addresses)
   end
 
   defp loop_acceptor(socket, addresses) do
     {:ok, client_socket} = :gen_tcp.accept(socket)
     {:ok, {addr, port}} = :inet.peername(client_socket)
-    Logger.debug fn ->
-      "Receive connection from #{inspect {addr, port}}"
-    end
+
+    Logger.debug(fn ->
+      "Receive connection from #{inspect({addr, port})}"
+    end)
+
     pid = start_child(:tcp, {client_socket, addr, port}, addresses)
     :ok = :gen_tcp.controlling_process(client_socket, pid)
     loop_acceptor(socket, addresses)
   end
 
   defp recv_udp(addresses, clients, refs) do
-    {clients, refs} = receive do
-      {:udp, socket, addr, port, packet} ->
-        client = {socket, addr, port}
-        Logger.debug fn ->
-          "MAIN: Get #{inspect packet} from #{inspect addr}:#{port}"
-        end
-        client_pid(addresses, refs, clients, {client, packet})
-      {:DOWN, ref, :process, pid, _} ->
-        drop_client(refs, clients, ref, pid)
-      msg ->
-        Logger.warn "MAIN: Ignoring #{inspect msg}"
-        {clients, refs}
-    end
+    {clients, refs} =
+      receive do
+        {:udp, socket, addr, port, packet} ->
+          client = {socket, addr, port}
+
+          Logger.debug(fn ->
+            "MAIN: Get #{inspect(packet)} from #{inspect(addr)}:#{port}"
+          end)
+
+          client_pid(addresses, refs, clients, {client, packet})
+
+        {:DOWN, ref, :process, pid, _} ->
+          drop_client(refs, clients, ref, pid)
+
+        msg ->
+          Logger.warn("MAIN: Ignoring #{inspect(msg)}")
+          {clients, refs}
+      end
+
     recv_udp(addresses, clients, refs)
   end
 
   defp drop_client(refs, clients, ref, pid) do
     {client, refs} = Map.pop(refs, ref)
     {^pid, clients} = Map.pop(clients, client)
-    Logger.debug fn ->
-      "MAIN: Drop #{inspect client}:#{inspect pid}"
-    end
+
+    Logger.debug(fn ->
+      "MAIN: Drop #{inspect(client)}:#{inspect(pid)}"
+    end)
+
     {clients, refs}
   end
 
   defp client_pid(addresses, refs, clients, {client, packet}) do
     {socket, addr, port} = client
-    {pid, clients, refs} = case Map.fetch(clients, client) do
-      {:ok, pid} -> {pid, clients, refs}
-      :error ->
-        pid = start_child(:udp, client, addresses)
-        clients = Map.put(clients, client, pid)
-        refs = Map.put(refs, Process.monitor(pid), client)
-        {pid, clients, refs}
-    end
+
+    {pid, clients, refs} =
+      case Map.fetch(clients, client) do
+        {:ok, pid} ->
+          {pid, clients, refs}
+
+        :error ->
+          pid = start_child(:udp, client, addresses)
+          clients = Map.put(clients, client, pid)
+          refs = Map.put(refs, Process.monitor(pid), client)
+          {pid, clients, refs}
+      end
+
     send(pid, {:udp, socket, addr, port, packet})
     {clients, refs}
   end
@@ -84,13 +105,17 @@ defmodule NXRedirect.Parent do
   defp start_child(protocol, {socket, addr, port}, addresses) do
     addresses = Map.put(addresses, :client, {addr, port})
     addresses = Map.put(addresses, {addr, port}, :client)
-    {:ok, pid} = Task.Supervisor.start_child(
-      NXRedirect.TaskSupervisor,
-      fn -> Child.start(protocol, socket, addresses) end
-    )
-    Logger.debug fn ->
-      "Started #{inspect pid} to handle #{inspect {addr, port}}"
-    end
+
+    {:ok, pid} =
+      Task.Supervisor.start_child(
+        NXRedirect.TaskSupervisor,
+        fn -> Child.start(protocol, socket, addresses) end
+      )
+
+    Logger.debug(fn ->
+      "Started #{inspect(pid)} to handle #{inspect({addr, port})}"
+    end)
+
     pid
   end
 end

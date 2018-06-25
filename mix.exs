@@ -2,28 +2,28 @@ defmodule NXRedirect.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :nxredirect,
-     version: "1.0.0",
-     elixir: "~> 1.6",
-     description: description(),
-     package: package(),
-     build_embedded: Mix.env == :prod,
-     start_permanent: Mix.env == :prod,
-     escript: escript(),
-     deps: deps()]
+    [
+      app: :nxredirect,
+      version: "1.0.0",
+      elixir: "~> 1.6",
+      description: description(),
+      package: package(),
+      build_embedded: Mix.env() == :prod,
+      start_permanent: Mix.env() == :prod,
+      escript: escript(),
+      deps: deps()
+    ]
   end
 
   # Configuration for the OTP application
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger],
-     mod: {NXRedirect, []}]
+    [applications: [:logger], mod: {NXRedirect, []}]
   end
 
   def escript do
-    [main_module: NXRedirect,
-     app: nil]
+    [main_module: NXRedirect, app: nil]
   end
 
   # Dependencies can be Hex packages:
@@ -46,13 +46,13 @@ defmodule NXRedirect.Mixfile do
   end
 
   defp package do
-     [
-       maintainers: ["Samuel BERNARD"],
-       licenses: ["Apache 2.0"],
-       links: %{
-         "sources" => "https://gitlab.com/samuel.bernard/nxredirect",
-         "issues" => "https://gitlab.com/samuel.bernard/nxredirect/issues"
-       }
-     ]
+    [
+      maintainers: ["Samuel BERNARD"],
+      licenses: ["Apache 2.0"],
+      links: %{
+        "sources" => "https://gitlab.com/samuel.bernard/nxredirect",
+        "issues" => "https://gitlab.com/samuel.bernard/nxredirect/issues"
+      }
+    ]
   end
 end

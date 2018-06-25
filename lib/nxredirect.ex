@@ -8,8 +8,10 @@ defmodule NXRedirect do
   require Logger
   alias NXRedirect.Parent, as: Parent
 
-  Record.defrecord :hostent,
+  Record.defrecord(
+    :hostent,
     Record.extract(:hostent, from_lib: "kernel/include/inet.hrl")
+  )
 
   def main(args) do
     {parsed, _, _} = OptionParser.parse(args)
@@ -30,15 +32,19 @@ defmodule NXRedirect do
     import Supervisor.Spec
     port = get_port()
     addresses = get_addresses()
+
     children = [
       supervisor(Task.Supervisor, [[name: NXRedirect.TaskSupervisor]]),
       worker(Task, [
-        Parent, :start, [port, addresses]
+        Parent,
+        :start,
+        [port, addresses]
       ])
     ]
+
     opts = [strategy: :one_for_one, name: NXRedirect.Supervisor]
-    Logger.info "Starting NXRedirect application!"
-    Logger.info printable_config(addresses, port)
+    Logger.info("Starting NXRedirect application!")
+    Logger.info(printable_config(addresses, port))
     Supervisor.start_link(children, opts)
   end
 
@@ -61,12 +67,14 @@ defmodule NXRedirect do
   end
 
   defp parse_host(host_port) do
-    host_port = if is_binary(host_port) do
-      [host, port] = String.split(host_port, ":")
-      {to_charlist(host), String.to_integer(port)}
-    else
-      host_port
-    end
+    host_port =
+      if is_binary(host_port) do
+        [host, port] = String.split(host_port, ":")
+        {to_charlist(host), String.to_integer(port)}
+      else
+        host_port
+      end
+
     {:ok, addr} = :inet.parse_address(elem(host_port, 0))
     {addr, elem(host_port, 1)}
   end
