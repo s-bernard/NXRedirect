@@ -11,7 +11,11 @@ architecture where the primary server is internal and the fallback is public.
 Installation
 ------------
 
-As [available in Hex](https://hex.pm), the package can be installed as:
+Currently, the best way to install it is to use this
+[Chef cookbook](https://gitlab.com/chef-platform/nxredirect-cookbook).
+
+When it will be [available in Hex](https://hex.pm), the package would be
+installable with:
 
   1. Add nxredirect to your list of dependencies in `mix.exs`:
 
