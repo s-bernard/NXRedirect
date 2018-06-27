@@ -151,7 +151,9 @@ defmodule NXRedirect.Child do
         exiting(socket, dest)
 
       msg ->
-        Logger.warn("#{inspect(self())}(#{client}): discarding #{inspect(msg)}")
+        Logger.warn(
+          "#{inspect(self())}(#{client}): discarding #{inspect(msg)}"
+        )
     end
 
     diplomat(socket, pid, {client, dest}, addresses)

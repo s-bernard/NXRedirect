@@ -10,7 +10,7 @@ use Mix.Config
 
 config :logger,
   utc_log: true,
-  compile_time_purge_level: if Mix.env == :prod, do: :info, else: :debug
+  compile_time_purge_level: if(Mix.env() == :prod, do: :info, else: :debug)
 
 # primary and fallback addresses can also be formated in string:
 # primary: "127.0.0.1:53",
