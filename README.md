@@ -1,6 +1,10 @@
 NXRedirect
 ==========
 
+*(Main repository is hosted on
+[gitlab.com](https://gitlab.com/samuel.bernard/nxredirect), please submit your
+issues and merge requests there.)*
+
 Description
 -----------
 
@@ -46,7 +50,7 @@ License and Author
 - Author: Samuel Bernard (<samuel.bernard@gmail.com>)
 
 ```text
-Copyright (c) 2016-2018, Samuel BERNARD
+Copyright (c) 2016-2020, Samuel BERNARD
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
